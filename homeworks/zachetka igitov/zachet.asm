@@ -1,7 +1,3 @@
-; CRC16_32.ASM - Расчет CRC-16 и CRC-32
-; Компиляция: TASM CRC16_32.ASM
-; Линковка:   TLINK CRC16_32.OBJ
-
 stack segment para stack
 db 256 dup(?)
 stack ends
