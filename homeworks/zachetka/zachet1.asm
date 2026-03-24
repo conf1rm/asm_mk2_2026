@@ -46,6 +46,8 @@ data segment para public
     dw 04E00h, 08EC1h, 08F81h, 04F40h, 08D01h, 04DC0h, 04C80h, 08C41h
     dw 04400h, 084C1h, 08581h, 04540h, 08701h, 047C0h, 04680h, 08641h
     dw 08201h, 042C0h, 04380h, 08341h, 04100h, 081C1h, 08081h, 04040h
+    
+    crc16_result dw 0ffffh
 data ends
 
 code segment para public
@@ -57,17 +59,62 @@ start:
     mov ax, stack
     mov ss, ax
     
+    call print_prompt
+    call read_string_input
+    call print_newline
+    call calc_crc16
+    call print_result_msg
+    call print_hex_result
+    call print_newline
+    
+    mov ax, 4c00h
+    int 21h
+
+print_prompt proc
+    push ax
+    push dx
+    
     mov ah, 9
     mov dx, offset prompt
     int 21h
+    
+    pop dx
+    pop ax
+    ret
+print_prompt endp
+
+read_string_input proc
+    push ax
+    push dx
     
     mov ah, 0ah
     mov dx, offset maxlen
     int 21h
     
+    pop dx
+    pop ax
+    ret
+read_string_input endp
+
+print_newline proc
+    push ax
+    push dx
+    
     mov ah, 9
     mov dx, offset newline
     int 21h
+    
+    pop dx
+    pop ax
+    ret
+print_newline endp
+
+calc_crc16 proc
+    push ax
+    push bx
+    push cx
+    push dx
+    push si
     
     mov cx, 0
     mov cl, actlen
@@ -75,78 +122,115 @@ start:
     mov bx, 0ffffh
     
     cmp cx, 0
-    je print
+    je calc_done
     
-calc:
-    lodsb
+calc_loop:
+    mov al, byte ptr [si]
     xor ah, ah
     push bx
     and bx, 0ffh
     xor bx, ax
     shl bx, 1
-    mov dx, word ptr crc16table[bx]
+    mov dx, word ptr [crc16table + bx]
     pop bx
     mov ax, bx
-    shr ax, 1
-    shr ax, 1
-    shr ax, 1
-    shr ax, 1
-    shr ax, 1
-    shr ax, 1
-    shr ax, 1
-    shr ax, 1
+    shr ax, 8
     xor ax, dx
     mov bx, ax
-    loop calc
+    inc si
+    loop calc_loop
     
-print:
+calc_done:
+    mov word ptr [crc16_result], bx
+    
+    pop si
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+    ret
+calc_crc16 endp
+
+print_result_msg proc
+    push ax
+    push dx
+    
     mov ah, 9
     mov dx, offset result
     int 21h
     
+    pop dx
+    pop ax
+    ret
+print_result_msg endp
+
+print_hex_result proc
+    push ax
+    push bx
+    push cx
+    push dx
+    push si
+    push di
+    
+    mov cx, 0
+    mov bx, word ptr [crc16_result]
+    
     mov al, bh
-    call hexbyte
+    call hex_byte_to_str
     mov al, bl
-    call hexbyte
+    call hex_byte_to_str
     
     mov ah, 9
     mov dx, offset hexout
     int 21h
     
-    mov ah, 9
-    mov dx, offset newline
-    int 21h
-    
-    mov ax, 4c00h
-    int 21h
-
-hexbyte proc
-    push ax
-    shr al, 1
-    shr al, 1
-    shr al, 1
-    shr al, 1
-    and ax, 0fh
-    mov di, offset hexout
-    add di, cx
-    mov si, offset hex
-    add si, ax
-    mov al, [si]
-    mov [di], al
-    pop ax
-    push ax
-    and ax, 0fh
-    inc cx
-    mov di, offset hexout
-    add di, cx
-    mov si, offset hex
-    add si, ax
-    mov al, [si]
-    mov [di], al
-    inc cx
+    pop di
+    pop si
+    pop dx
+    pop cx
+    pop bx
     pop ax
     ret
-hexbyte endp
+print_hex_result endp
+
+hex_byte_to_str proc
+    push ax
+    push bx
+    push cx
+    push dx
+    push di
+    push si
+    
+    mov di, offset hexout
+    add di, cx
+    
+    push ax
+    shr al, 4
+    and ax, 0fh
+    mov si, offset hex
+    add si, ax
+    mov al, byte ptr [si]
+    mov byte ptr [di], al
+    
+    pop ax
+    and ax, 0fh
+    inc cx
+    mov di, offset hexout
+    add di, cx
+    mov si, offset hex
+    add si, ax
+    mov al, byte ptr [si]
+    mov byte ptr [di], al
+    inc cx
+    
+    pop si
+    pop di
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+    ret
+hex_byte_to_str endp
 
 code ends
 end start
