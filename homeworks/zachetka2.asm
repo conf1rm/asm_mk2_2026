@@ -13,10 +13,10 @@ data segment para public
 inp_buf db 255, 0, 256 dup(0)
 base_buf db 3, 0, 4 dup(0)
 
-msg_base_ask db "base (d/h): $"
+msg_base_ask db "dec(d) or hex(h): $"
 msg_expr_ask db "expression: $"
-msg_res_dec db "dec: $"
-msg_res_hex db "hex: $"
+msg_res_dec db "dec(d): $"
+msg_res_hex db "hex(h): $"
 msg_err_fmt db "invalid format$"
 msg_err_op db "invalid operator$"
 msg_err_div0 db "division by zero$"
@@ -721,12 +721,11 @@ i32h_pos:
     jmp i32h_finish
 
 i32h_nonzero:
-    mov si, ax
-    mov bx, dx
+    push ax
+    push dx
     xor cx, cx
 
-    push si
-    mov dx, bx
+    mov dx, [bp+arg2]
     mov si, 4
 
 i32h_hi_loop:
@@ -754,30 +753,14 @@ i32h_hi_store:
 i32h_hi_skip:
     dec si
     jnz i32h_hi_loop
-    pop si
 
-    mov dx, si
+    pop dx
+    pop ax
+    mov dx, ax
     mov si, 4
 
     cmp cx, 0
-    je i32h_lo_loop
-
-i32h_lo_loop_full:
-    rol dx, 4
-    mov ax, dx
-    and ax, 000Fh
-    cmp al, 10
-    jb i32h_lo_below
-    add al, 'A' - 10
-    jmp i32h_lo_store
-i32h_lo_below:
-    add al, '0'
-i32h_lo_store:
-    mov byte ptr [di], al
-    inc di
-    dec si
-    jnz i32h_lo_loop_full
-    jmp i32h_finish
+    jne i32h_lo_full
 
 i32h_lo_loop:
     rol dx, 4
@@ -804,7 +787,25 @@ i32h_lo_store:
 i32h_lo_skip:
     dec si
     jnz i32h_lo_loop
+    jmp i32h_check_zero
 
+i32h_lo_full:
+    rol dx, 4
+    mov ax, dx
+    and ax, 000Fh
+    cmp al, 10
+    jb i32h_lo_full_below
+    add al, 'A' - 10
+    jmp i32h_lo_full_store
+i32h_lo_full_below:
+    add al, '0'
+i32h_lo_full_store:
+    mov byte ptr [di], al
+    inc di
+    dec si
+    jnz i32h_lo_full
+
+i32h_check_zero:
     cmp cx, 0
     jne i32h_finish
     mov byte ptr [di], '0'
@@ -1043,11 +1044,11 @@ _calc:
 
     push offset msg_expr_ask
     call _putstr
-    pop dx
+    add sp, 2
 
     push offset inp_buf
     call _getstr
-    pop dx
+    add sp, 2
 
     call _newline
 
@@ -1058,14 +1059,14 @@ _calc:
 
     push ax
     call _parse_dec
-    pop dx
+    add sp, 2
     jc calc_error
     jmp calc_do
 
 calc_hex:
     push ax
     call _parse_hex
-    pop dx
+    add sp, 2
     jc calc_error
 
 calc_do:
@@ -1075,9 +1076,7 @@ calc_do:
     push word ptr [val2]
     push word ptr [val1]
     call _calc_op
-    pop dx
-    pop dx
-    pop dx
+    add sp, 6
     jc calc_error
 
     call _print_res
@@ -1086,7 +1085,7 @@ calc_do:
 calc_error:
     push ax
     call _print_err
-    pop dx
+    add sp, 2
 
 calc_done:
     call _newline
