@@ -3,6 +3,7 @@
 arg1 equ 4
 arg2 equ 6
 arg3 equ 8
+arg4 equ 10
 
 stack segment para stack
 db 65530 dup(?)
@@ -26,6 +27,7 @@ msg_err_dov db "division overflow$"
 
 temp_buf db 32 dup(0)
 
+ERR_SUCCESS equ 0
 ERR_FORMAT equ 1
 ERR_OPERATOR equ 2
 ERR_DIV_ZERO equ 3
@@ -40,6 +42,7 @@ num_base db ?
 res_low dw ?
 res_high dw ?
 is_32bit db ?
+error_code dw ?
 
 data ends
 
@@ -105,12 +108,13 @@ _read_base:
     je base_ok
 
 base_err:
-    mov ax, ERR_BASE
+    mov word ptr [error_code], ERR_BASE
     stc
     jmp base_exit
 
 base_ok:
     mov byte ptr [num_base], al
+    mov word ptr [error_code], ERR_SUCCESS
     clc
 
 base_exit:
@@ -123,81 +127,90 @@ _str_to_dec:
     push cx
     push dx
     push di
+    push si
 
     mov si, [bp+arg1]
     xor ax, ax
     xor di, di
 
     cmp byte ptr [si], '-'
-    jne dec_check_digits
+    jne dec_parse_start
     mov di, 1
     inc si
 
-dec_check_digits:
-    cmp byte ptr [si], '0'
-    jb dec_err
-    cmp byte ptr [si], '9'
-    ja dec_err
+dec_parse_start:
+    cmp byte ptr [si], 0
+    je dec_empty_err
+    cmp byte ptr [si], ' '
+    je dec_empty_err
 
-dec_loop:
+    xor ax, ax
+
+dec_parse_loop:
     mov dl, byte ptr [si]
-    cmp dl, ' '
-    je dec_done
     cmp dl, 0
-    je dec_done
+    je dec_parse_done
+    cmp dl, ' '
+    je dec_parse_done
 
     cmp dl, '0'
-    jb dec_err
+    jb dec_format_err
     cmp dl, '9'
-    ja dec_err
+    ja dec_format_err
 
     sub dl, '0'
     xor dh, dh
-    xor cx, cx
     mov cx, dx
 
     cmp di, 0
-    jne dec_check_neg
+    jne dec_neg_check
 
     cmp ax, 3276
-    ja dec_range
+    ja dec_range_err
     jne dec_safe_mul
     cmp cl, 7
-    ja dec_range
+    ja dec_range_err
     jmp dec_safe_mul
 
-dec_check_neg:
+dec_neg_check:
     cmp ax, 3276
-    ja dec_range
+    ja dec_range_err
     jne dec_safe_mul
     cmp cl, 8
-    ja dec_range
+    ja dec_range_err
 
 dec_safe_mul:
     imul ax, 10
     add ax, cx
     inc si
-    jmp dec_loop
+    jmp dec_parse_loop
 
-dec_done:
+dec_parse_done:
     cmp di, 0
-    je dec_ok
+    je dec_success
     neg ax
 
-dec_ok:
+dec_success:
+    mov word ptr [error_code], ERR_SUCCESS
     clc
     jmp dec_exit
 
-dec_err:
-    mov ax, ERR_FORMAT
+dec_format_err:
+    mov word ptr [error_code], ERR_FORMAT
     stc
     jmp dec_exit
 
-dec_range:
-    mov ax, ERR_RANGE
+dec_range_err:
+    mov word ptr [error_code], ERR_RANGE
+    stc
+    jmp dec_exit
+
+dec_empty_err:
+    mov word ptr [error_code], ERR_FORMAT
     stc
 
 dec_exit:
+    pop si
     pop di
     pop dx
     pop cx
@@ -210,54 +223,49 @@ _str_to_hex:
     push bx
     push cx
     push di
+    push si
 
     mov si, [bp+arg1]
     xor ax, ax
     xor di, di
 
     cmp byte ptr [si], '-'
-    jne hex_check_char
+    jne hex_parse_start
     mov di, 1
     inc si
 
-hex_check_char:
-    mov cl, byte ptr [si]
-    cmp cl, '0'
-    jb hex_err
-    cmp cl, '9'
-    jbe hex_loop_start
-    cmp cl, 'A'
-    jb hex_err
-    cmp cl, 'F'
-    jbe hex_loop_start
-    cmp cl, 'a'
-    jb hex_err
-    cmp cl, 'f'
-    jbe hex_loop_start
-    jmp hex_err
+hex_parse_start:
+    cmp byte ptr [si], 0
+    je hex_empty_err
+    cmp byte ptr [si], ' '
+    je hex_empty_err
 
-hex_loop_start:
+    xor ax, ax
+
+hex_parse_loop:
     mov cl, byte ptr [si]
-    cmp cl, ' '
-    je hex_done
     cmp cl, 0
-    je hex_done
+    je hex_parse_done
+    cmp cl, ' '
+    je hex_parse_done
 
     cmp cl, '0'
-    jb hex_err
+    jb hex_format_err
     cmp cl, '9'
     jbe hex_digit_09
     cmp cl, 'A'
-    jb hex_try_lower
+    jb hex_format_err
     cmp cl, 'F'
     jbe hex_digit_AF
-
-hex_try_lower:
     cmp cl, 'a'
-    jb hex_err
+    jb hex_format_err
     cmp cl, 'f'
-    ja hex_err
+    jbe hex_lower
+    jmp hex_format_err
+
+hex_lower:
     sub cl, 20h
+    jmp hex_digit_AF
 
 hex_digit_AF:
     sub cl, 'A'
@@ -271,53 +279,75 @@ hex_apply:
     xor ch, ch
 
     cmp di, 0
-    jne hex_check_neg_ov
+    jne hex_neg_check
 
     cmp ax, 2048
-    jae hex_range
+    jae hex_range_err
     jmp hex_safe
 
-hex_check_neg_ov:
+hex_neg_check:
     cmp ax, 2048
-    ja hex_range
+    ja hex_range_err
     jb hex_safe
     cmp cl, 0
-    ja hex_range
+    ja hex_range_err
 
 hex_safe:
     shl ax, 4
     add ax, cx
     inc si
-    jmp hex_loop_start
+    jmp hex_parse_loop
 
-hex_done:
+hex_parse_done:
     cmp di, 0
-    je hex_ok
+    je hex_success
     neg ax
 
-hex_ok:
+hex_success:
+    mov word ptr [error_code], ERR_SUCCESS
     clc
     jmp hex_exit
 
-hex_err:
-    mov ax, ERR_FORMAT
+hex_format_err:
+    mov word ptr [error_code], ERR_FORMAT
     stc
     jmp hex_exit
 
-hex_range:
-    mov ax, ERR_RANGE
+hex_range_err:
+    mov word ptr [error_code], ERR_RANGE
+    stc
+    jmp hex_exit
+
+hex_empty_err:
+    mov word ptr [error_code], ERR_FORMAT
     stc
 
 hex_exit:
+    pop si
     pop di
     pop cx
     pop bx
     pop bp
     ret
 
+_skip_spaces:
+    push bp
+    mov bp, sp
+    mov si, [bp+arg1]
+skip_loop:
+    cmp byte ptr [si], ' '
+    jne skip_done
+    inc si
+    jmp skip_loop
+skip_done:
+    mov ax, si
+    pop bp
+    ret
+
 _parse_dec:
     push bp
     mov bp, sp
+    sub sp, 2
     push bx
     push cx
     push dx
@@ -325,14 +355,27 @@ _parse_dec:
     mov si, [bp+arg1]
 
     push si
+    call _skip_spaces
+    add sp, 2
+    mov si, ax
+
+    push si
     call _str_to_dec
-    pop dx
-    jc parse_err
+    add sp, 2
+    cmp word ptr [error_code], ERR_SUCCESS
+    jne parse_err
     mov word ptr [val1], ax
 
-    cmp byte ptr [si], ' '
-    jne parse_fmt_err
-    inc si
+    mov si, ax
+    add si, [bp+arg1]
+    mov si, [bp+arg1]
+    push si
+    call _skip_spaces
+    add sp, 2
+    mov si, ax
+
+    cmp byte ptr [si], 0
+    je parse_fmt_err
 
     mov al, byte ptr [si]
     cmp al, '+'
@@ -346,7 +389,7 @@ _parse_dec:
     cmp al, '%'
     je parse_op_ok
 
-    mov ax, ERR_OPERATOR
+    mov word ptr [error_code], ERR_OPERATOR
     stc
     jmp parse_err
 
@@ -360,18 +403,26 @@ parse_op_ok:
 
     push si
     call _str_to_dec
-    pop dx
-    jc parse_err
+    add sp, 2
+    cmp word ptr [error_code], ERR_SUCCESS
+    jne parse_err
     mov word ptr [val2], ax
+
+    mov si, [bp+arg1]
+    push si
+    call _skip_spaces
+    add sp, 2
+    mov si, ax
 
     cmp byte ptr [si], 0
     jne parse_fmt_err
 
+    mov word ptr [error_code], ERR_SUCCESS
     clc
     jmp parse_exit
 
 parse_fmt_err:
-    mov ax, ERR_FORMAT
+    mov word ptr [error_code], ERR_FORMAT
     stc
 
 parse_err:
@@ -379,12 +430,14 @@ parse_exit:
     pop dx
     pop cx
     pop bx
+    mov sp, bp
     pop bp
     ret
 
 _parse_hex:
     push bp
     mov bp, sp
+    sub sp, 2
     push bx
     push cx
     push dx
@@ -392,14 +445,25 @@ _parse_hex:
     mov si, [bp+arg1]
 
     push si
+    call _skip_spaces
+    add sp, 2
+    mov si, ax
+
+    push si
     call _str_to_hex
-    pop dx
-    jc parse_hex_err
+    add sp, 2
+    cmp word ptr [error_code], ERR_SUCCESS
+    jne parse_hex_err
     mov word ptr [val1], ax
 
-    cmp byte ptr [si], ' '
-    jne parse_hex_fmt_err
-    inc si
+    mov si, [bp+arg1]
+    push si
+    call _skip_spaces
+    add sp, 2
+    mov si, ax
+
+    cmp byte ptr [si], 0
+    je parse_hex_fmt_err
 
     mov al, byte ptr [si]
     cmp al, '+'
@@ -413,7 +477,7 @@ _parse_hex:
     cmp al, '%'
     je parse_hex_op_ok
 
-    mov ax, ERR_OPERATOR
+    mov word ptr [error_code], ERR_OPERATOR
     stc
     jmp parse_hex_err
 
@@ -427,18 +491,26 @@ parse_hex_op_ok:
 
     push si
     call _str_to_hex
-    pop dx
-    jc parse_hex_err
+    add sp, 2
+    cmp word ptr [error_code], ERR_SUCCESS
+    jne parse_hex_err
     mov word ptr [val2], ax
+
+    mov si, [bp+arg1]
+    push si
+    call _skip_spaces
+    add sp, 2
+    mov si, ax
 
     cmp byte ptr [si], 0
     jne parse_hex_fmt_err
 
+    mov word ptr [error_code], ERR_SUCCESS
     clc
     jmp parse_hex_exit
 
 parse_hex_fmt_err:
-    mov ax, ERR_FORMAT
+    mov word ptr [error_code], ERR_FORMAT
     stc
 
 parse_hex_err:
@@ -446,6 +518,7 @@ parse_hex_exit:
     pop dx
     pop cx
     pop bx
+    mov sp, bp
     pop bp
     ret
 
@@ -721,12 +794,11 @@ i32h_pos:
     jmp i32h_finish
 
 i32h_nonzero:
-    mov si, ax
-    mov bx, dx
+    push ax
+    push dx
     xor cx, cx
 
-    push si
-    mov dx, bx
+    mov dx, [bp+arg2]
     mov si, 4
 
 i32h_hi_loop:
@@ -754,30 +826,14 @@ i32h_hi_store:
 i32h_hi_skip:
     dec si
     jnz i32h_hi_loop
-    pop si
 
-    mov dx, si
+    pop dx
+    pop ax
+    mov dx, ax
     mov si, 4
 
     cmp cx, 0
-    je i32h_lo_loop
-
-i32h_lo_loop_full:
-    rol dx, 4
-    mov ax, dx
-    and ax, 000Fh
-    cmp al, 10
-    jb i32h_lo_below
-    add al, 'A' - 10
-    jmp i32h_lo_store
-i32h_lo_below:
-    add al, '0'
-i32h_lo_store:
-    mov byte ptr [di], al
-    inc di
-    dec si
-    jnz i32h_lo_loop_full
-    jmp i32h_finish
+    jne i32h_lo_full
 
 i32h_lo_loop:
     rol dx, 4
@@ -804,7 +860,25 @@ i32h_lo_store:
 i32h_lo_skip:
     dec si
     jnz i32h_lo_loop
+    jmp i32h_check_zero
 
+i32h_lo_full:
+    rol dx, 4
+    mov ax, dx
+    and ax, 000Fh
+    cmp al, 10
+    jb i32h_lo_full_below
+    add al, 'A' - 10
+    jmp i32h_lo_full_store
+i32h_lo_full_below:
+    add al, '0'
+i32h_lo_full_store:
+    mov byte ptr [di], al
+    inc di
+    dec si
+    jnz i32h_lo_full
+
+i32h_check_zero:
     cmp cx, 0
     jne i32h_finish
     mov byte ptr [di], '0'
@@ -842,7 +916,7 @@ _calc_op:
     cmp cl, '%'
     je op_mod
 
-    mov ax, ERR_OPERATOR
+    mov word ptr [error_code], ERR_OPERATOR
     stc
     jmp op_exit
 
@@ -852,6 +926,7 @@ op_add:
     mov word ptr [res_low], ax
     mov word ptr [res_high], 0
     mov byte ptr [is_32bit], 0
+    mov word ptr [error_code], ERR_SUCCESS
     clc
     jmp op_exit
 
@@ -861,6 +936,7 @@ op_sub:
     mov word ptr [res_low], ax
     mov word ptr [res_high], 0
     mov byte ptr [is_32bit], 0
+    mov word ptr [error_code], ERR_SUCCESS
     clc
     jmp op_exit
 
@@ -869,6 +945,7 @@ op_mul:
     mov word ptr [res_low], ax
     mov word ptr [res_high], dx
     mov byte ptr [is_32bit], 1
+    mov word ptr [error_code], ERR_SUCCESS
     clc
     jmp op_exit
 
@@ -886,6 +963,7 @@ op_div_safe:
     mov word ptr [res_low], ax
     mov word ptr [res_high], 0
     mov byte ptr [is_32bit], 0
+    mov word ptr [error_code], ERR_SUCCESS
     clc
     jmp op_exit
 
@@ -899,6 +977,7 @@ op_mod:
     mov word ptr [res_low], 0
     mov word ptr [res_high], 0
     mov byte ptr [is_32bit], 0
+    mov word ptr [error_code], ERR_SUCCESS
     clc
     jmp op_exit
 
@@ -908,21 +987,22 @@ op_mod_safe:
     mov word ptr [res_low], dx
     mov word ptr [res_high], 0
     mov byte ptr [is_32bit], 0
+    mov word ptr [error_code], ERR_SUCCESS
     clc
     jmp op_exit
 
 op_overflow:
-    mov ax, ERR_RANGE
+    mov word ptr [error_code], ERR_RANGE
     stc
     jmp op_exit
 
 op_div_zero:
-    mov ax, ERR_DIV_ZERO
+    mov word ptr [error_code], ERR_DIV_ZERO
     stc
     jmp op_exit
 
 op_div_over:
-    mov ax, ERR_DIV_OVER
+    mov word ptr [error_code], ERR_DIV_OVER
     stc
 
 op_exit:
@@ -993,7 +1073,7 @@ _print_err:
     push bp
     mov bp, sp
 
-    mov ax, [bp+arg1]
+    mov ax, word ptr [error_code]
 
     cmp ax, ERR_FORMAT
     je pe_fmt
@@ -1007,7 +1087,7 @@ _print_err:
     je pe_base
     cmp ax, ERR_DIV_OVER
     je pe_dov
-    jmp pe_fmt
+    jmp pe_none
 
 pe_fmt:
     push offset msg_err_fmt
@@ -1031,6 +1111,7 @@ pe_print:
     call _putstr
     add sp, 2
 
+pe_none:
     pop bp
     ret
 
@@ -1038,16 +1119,19 @@ _calc:
     push bp
     mov bp, sp
 
+    mov word ptr [error_code], ERR_SUCCESS
+
     call _read_base
-    jc calc_error
+    cmp word ptr [error_code], ERR_SUCCESS
+    jne calc_error
 
     push offset msg_expr_ask
     call _putstr
-    pop dx
+    add sp, 2
 
     push offset inp_buf
     call _getstr
-    pop dx
+    add sp, 2
 
     call _newline
 
@@ -1058,15 +1142,17 @@ _calc:
 
     push ax
     call _parse_dec
-    pop dx
-    jc calc_error
+    add sp, 2
+    cmp word ptr [error_code], ERR_SUCCESS
+    jne calc_error
     jmp calc_do
 
 calc_hex:
     push ax
     call _parse_hex
-    pop dx
-    jc calc_error
+    add sp, 2
+    cmp word ptr [error_code], ERR_SUCCESS
+    jne calc_error
 
 calc_do:
     mov al, byte ptr [oper]
@@ -1075,18 +1161,16 @@ calc_do:
     push word ptr [val2]
     push word ptr [val1]
     call _calc_op
-    pop dx
-    pop dx
-    pop dx
-    jc calc_error
+    add sp, 6
+    cmp word ptr [error_code], ERR_SUCCESS
+    jne calc_error
 
     call _print_res
     jmp calc_done
 
 calc_error:
-    push ax
     call _print_err
-    pop dx
+    call _newline
 
 calc_done:
     call _newline
