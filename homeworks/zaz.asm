@@ -14,10 +14,10 @@ data segment para public
 inp_buf db 255, 0, 256 dup(0)
 base_buf db 3, 0, 4 dup(0)
 
-msg_base_ask db "base (d/h): $"
+msg_base_ask db "dec(d) or hex(h): $"
 msg_expr_ask db "expression: $"
-msg_res_dec db "dec: $"
-msg_res_hex db "hex: $"
+msg_res_dec db "dec(d): $"
+msg_res_hex db "hex(h): $"
 msg_err_fmt db "invalid format$"
 msg_err_op db "invalid operator$"
 msg_err_div0 db "division by zero$"
@@ -1143,16 +1143,24 @@ _calc:
     push ax
     call _parse_dec
     add sp, 2
+<<<<<<< HEAD:homeworks/zaz.asm
     cmp word ptr [error_code], ERR_SUCCESS
     jne calc_error
+=======
+    jc calc_error
+>>>>>>> 83a41c1413c1b5f14e273ffc749012215b1d8543:homeworks/zachetka2.asm
     jmp calc_do
 
 calc_hex:
     push ax
     call _parse_hex
     add sp, 2
+<<<<<<< HEAD:homeworks/zaz.asm
     cmp word ptr [error_code], ERR_SUCCESS
     jne calc_error
+=======
+    jc calc_error
+>>>>>>> 83a41c1413c1b5f14e273ffc749012215b1d8543:homeworks/zachetka2.asm
 
 calc_do:
     mov al, byte ptr [oper]
@@ -1162,15 +1170,23 @@ calc_do:
     push word ptr [val1]
     call _calc_op
     add sp, 6
+<<<<<<< HEAD:homeworks/zaz.asm
     cmp word ptr [error_code], ERR_SUCCESS
     jne calc_error
+=======
+    jc calc_error
+>>>>>>> 83a41c1413c1b5f14e273ffc749012215b1d8543:homeworks/zachetka2.asm
 
     call _print_res
     jmp calc_done
 
 calc_error:
     call _print_err
+<<<<<<< HEAD:homeworks/zaz.asm
     call _newline
+=======
+    add sp, 2
+>>>>>>> 83a41c1413c1b5f14e273ffc749012215b1d8543:homeworks/zachetka2.asm
 
 calc_done:
     call _newline
