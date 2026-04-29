@@ -1,4 +1,3 @@
-﻿; Макросы для сохранения/восстановления регистров
 pushregs macro reg1, reg2, reg3, reg4, reg5, reg6, reg7, reg8, reg9, reg10
     ifnb <reg1>
         push reg1
@@ -13,7 +12,6 @@ popregs macro reg1, reg2, reg3, reg4, reg5, reg6, reg7, reg8, reg9, reg10
     endif
 endm
 
-; Макросы для аргументов и локальных переменных
 arg1 equ 4
 arg2 equ 6
 arg3 equ 8
