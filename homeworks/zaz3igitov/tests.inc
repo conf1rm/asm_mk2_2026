@@ -1,15 +1,14 @@
-﻿; void print_result(char* message, bool res)
 print_result proc near
     push bp
     mov bp, sp
     pusha
 
-    mov dx, word ptr [bp+6]      
+    mov dx, word ptr [bp+6]
     push dx
     call putstr
     add sp, 2
     
-    mov bx, word ptr [bp+4] 
+    mov bx, word ptr [bp+4]
     cmp bx, 0
     jne pr_fail
     mov dx, offset msg_pass
@@ -27,7 +26,6 @@ pr_print:
     ret
 print_result endp
 
-; ========== STRLEN ==========
 test_strlen proc near
     push bp
     mov bp, sp
@@ -65,7 +63,6 @@ tstrlen_end:
     ret
 test_strlen endp
 
-; ========== STRCHR ==========
 test_strchr proc near
     push bp
     mov bp, sp
@@ -106,7 +103,6 @@ tschr_end:
     ret
 test_strchr endp
 
-; ========== STRCPY ==========
 test_strcpy proc near
     push bp
     mov bp, sp
@@ -138,7 +134,6 @@ tstrcpy_end:
     ret
 test_strcpy endp
 
-; ========== STRCAT ==========
 test_strcat proc near
     push bp
     mov bp, sp
@@ -177,7 +172,6 @@ tstrcat_end:
     ret
 test_strcat endp
 
-; ========== STRCMP ==========
 test_strcmp proc near
     push bp
     mov bp, sp
@@ -211,7 +205,6 @@ tstrcmp_end:
     ret
 test_strcmp endp
 
-; ========== STRICMP ==========
 test_stricmp proc near
     push bp
     mov bp, sp
@@ -245,7 +238,6 @@ tstricmp_end:
     ret
 test_stricmp endp
 
-; ========== STRSTR ==========
 test_strstr proc near
     push bp
     mov bp, sp
@@ -279,7 +271,6 @@ tstrstr_end:
     ret
 test_strstr endp
 
-; ========== strtol ==========
 test_strtol proc near
     push bp
     mov bp, sp
@@ -315,7 +306,6 @@ tstrtol_end:
     ret
 test_strtol endp
 
-; ========== STRDUP ==========
 test_strdup proc near
     push bp
     mov bp, sp
