@@ -1,4 +1,3 @@
-; Функции для ввода-вывода строк/символов (используется соглашение cdecl)
 .386
 
 ACCESS_READ     EQU 0
@@ -26,7 +25,6 @@ stack ends
 
 data segment para public use16
 
-; errors
     ERROR_ALLOC equ 0
     ERROR_OPEN equ 1
     ERROR_LSEEK equ 2
@@ -102,10 +100,9 @@ data segment para public use16
                 dw offset fio_err_invalid_device_req
                 dw offset fio_err_read_fault
                 dw offset fio_err_general_failure
-   
 
-	str1 db 256 dup(?)
-	str2 db "Hello, World!", 0
+    str1 db 256 dup(?)
+    str2 db "Hello, World!", 0
 
     test_str1       db "Hello", 0
     test_str2       db "Hello, World!", 0
@@ -121,8 +118,7 @@ data segment para public use16
     test_str_upper db "ABC", 0
     test_str_apple db "apple", 0
     test_str_banana db "BANANA", 0
-	test_str_cat_res db "Helloabd", 0
-    
+    test_str_cat_res db "Helloabd", 0
 
     test_strtol1   db "123",0
     test_strtol2   db "-456",0
@@ -137,7 +133,6 @@ data segment para public use16
     test_strtol11  db "-32768",0
     test_end_ptr   dw ?
 
-
     msg_pass        db " PASS", 13, 10, 0
     msg_fail        db " FAIL", 13, 10, 0
     msg_strlen      db "Test strlen", 0
@@ -148,12 +143,10 @@ data segment para public use16
     msg_stricmp     db "Test stricmp", 0
     msg_strtol      db "Test strtol ", 0
     msg_strdup      db "Test strdup", 0
-	msg_strcat      db "Test strcat", 0
+    msg_strcat      db "Test strcat", 0
 
     msg_loaded_str  db "Loaded string from file: ", 13, 10, 0
     msg_filed_to_find_delimiter  db "failed to find delimiter '|' in string!", 13, 10, 0
-
-
 
 data ends
 
@@ -173,9 +166,9 @@ include error.inc
 
 include tests.inc
 
-_test proc near
+run_tests proc near
     push bp
-    mov bp, sp   
+    mov bp, sp
 
     call putnewline
 
@@ -186,33 +179,33 @@ _test proc near
     call test_strcmp
     call test_stricmp
     call test_strcpy
-	call test_strcat 
+    call test_strcat
     call putnewline
-
 
     mov sp, bp
     pop bp
     ret
-_test endp
- 
-start:
+run_tests endp
+
+entry_point:
     mov ax, data
     mov ds, ax
     mov es, ax
     mov ax, stack
     mov ss, ax
-	nop
+    nop
 
-    push offset end_code_seg
+    push offset code_end_label
     push cs
     push es
     call InitMem
-    add sp, 6 
+    add sp, 6
 
-    call _test
-    
+    call run_tests
+
     call exit0
-end_code_seg:
+code_end_label:
+
 code ends
 
-end start
+end entry_point
