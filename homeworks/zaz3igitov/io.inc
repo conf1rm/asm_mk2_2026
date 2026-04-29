@@ -1,5 +1,4 @@
-; void putchar(int c)
-; выводит символ на экран (младший байт переданного аргумента)
+
 putchar proc near
     push bp
     mov bp, sp
@@ -13,8 +12,6 @@ putchar proc near
     ret
 putchar endp    
 
-; int getchar()
-; читает символ с клавиатуры и возвращает его (считанный символ - младший байт (al) регистра ax)
 getchar proc near
     push bp
     mov bp, sp
@@ -27,20 +24,16 @@ getchar proc near
     ret
 getchar endp
 
-
-; void putstr(const char *str)
-; выводит строку на экран (до завершающего нуля), адрес которой передан в качестве аргумента
 putstr proc near
     push bp
     mov bp, sp
     pushregs cx, dx, bx, ax
 
-    ; находим длину строки
     push word ptr [bp + 4] 
     call strlen
     add sp, 2
     
-    ; выводим строку
+
     mov cx, ax
     mov dx, word ptr [bp + 4]
     mov ah, 40h
@@ -53,9 +46,6 @@ putstr proc near
     ret
 putstr endp
 
-; void getstr(const char *str, int max_len)
-; читает строку с клавиатуры (либо max_len - 1 байт, либо до перевода строки) и сохраняет её в память, 
-; при этом дописывает в конец строки завершающий 0
 getstr proc near
     push bp
     mov bp, sp
@@ -88,9 +78,6 @@ getsret:
     ret
 getstr endp
 
-
-; void putnewline()
-; выводит на экран возврат каретки (\r) и перевод строки (\n), т.е. переводит вывод на новую строку
 putnewline proc near
     push bp
     mov bp, sp
