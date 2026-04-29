@@ -1143,25 +1143,17 @@ _calc:
     push ax
     call _parse_dec
     add sp, 2
-<<<<<<< HEAD:homeworks/zaz.asm
     cmp word ptr [error_code], ERR_SUCCESS
     jne calc_error
-=======
     jc calc_error
->>>>>>> 83a41c1413c1b5f14e273ffc749012215b1d8543:homeworks/zachetka2.asm
     jmp calc_do
-
 calc_hex:
     push ax
     call _parse_hex
     add sp, 2
-<<<<<<< HEAD:homeworks/zaz.asm
     cmp word ptr [error_code], ERR_SUCCESS
     jne calc_error
-=======
     jc calc_error
->>>>>>> 83a41c1413c1b5f14e273ffc749012215b1d8543:homeworks/zachetka2.asm
-
 calc_do:
     mov al, byte ptr [oper]
     xor ah, ah
@@ -1170,24 +1162,15 @@ calc_do:
     push word ptr [val1]
     call _calc_op
     add sp, 6
-<<<<<<< HEAD:homeworks/zaz.asm
     cmp word ptr [error_code], ERR_SUCCESS
     jne calc_error
-=======
     jc calc_error
->>>>>>> 83a41c1413c1b5f14e273ffc749012215b1d8543:homeworks/zachetka2.asm
-
     call _print_res
     jmp calc_done
-
 calc_error:
     call _print_err
-<<<<<<< HEAD:homeworks/zaz.asm
     call _newline
-=======
     add sp, 2
->>>>>>> 83a41c1413c1b5f14e273ffc749012215b1d8543:homeworks/zachetka2.asm
-
 calc_done:
     call _newline
     pop bp
