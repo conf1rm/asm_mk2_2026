@@ -1,9 +1,8 @@
-;void error_handler
 error_handler proc near 
     push bp
     mov bp, sp
 
-    mov  ax, word ptr [bp+arg1]        ; AX = error_code
+    mov  ax, word ptr [bp+arg1]        
     mov  bx, ax
     shl  bx, 1
     mov  dx, word ptr [err_vec + bx] 
@@ -24,7 +23,7 @@ fio_error_handler proc near
     push bp
     mov bp, sp
 
-    mov  bx, word ptr [bp+arg1]        ; BX = error_code
+    mov  bx, word ptr [bp+arg1]       
     shl  bx, 1
     mov  dx, word ptr [fio_err_vec + bx] 
 
