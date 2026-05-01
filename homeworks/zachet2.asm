@@ -121,6 +121,20 @@ base_exit:
     pop bp
     ret
 
+_skip_spaces:
+    push bp
+    mov bp, sp
+    mov si, [bp+arg1]
+skip_loop:
+    cmp byte ptr [si], ' '
+    jne skip_done
+    inc si
+    jmp skip_loop
+skip_done:
+    mov ax, si
+    pop bp
+    ret
+
 _str_to_dec:
     push bp
     mov bp, sp
@@ -132,6 +146,7 @@ _str_to_dec:
     mov si, [bp+arg1]
     xor ax, ax
     xor di, di
+    xor cx, cx
 
     cmp byte ptr [si], '-'
     jne dec_parse_start
@@ -147,6 +162,10 @@ dec_parse_start:
     xor ax, ax
 
 dec_parse_loop:
+    inc cx
+    cmp cx, 6
+    ja dec_range_err
+
     mov dl, byte ptr [si]
     cmp dl, 0
     je dec_parse_done
@@ -160,7 +179,7 @@ dec_parse_loop:
 
     sub dl, '0'
     xor dh, dh
-    mov cx, dx
+    push dx
 
     cmp di, 0
     jne dec_neg_check
@@ -168,7 +187,7 @@ dec_parse_loop:
     cmp ax, 3276
     ja dec_range_err
     jne dec_safe_mul
-    cmp cl, 7
+    cmp byte ptr [si], '7'
     ja dec_range_err
     jmp dec_safe_mul
 
@@ -176,12 +195,13 @@ dec_neg_check:
     cmp ax, 3276
     ja dec_range_err
     jne dec_safe_mul
-    cmp cl, 8
+    cmp byte ptr [si], '8'
     ja dec_range_err
 
 dec_safe_mul:
     imul ax, 10
-    add ax, cx
+    pop dx
+    add ax, dx
     inc si
     jmp dec_parse_loop
 
@@ -196,11 +216,13 @@ dec_success:
     jmp dec_exit
 
 dec_format_err:
+    pop dx
     mov word ptr [error_code], ERR_FORMAT
     stc
     jmp dec_exit
 
 dec_range_err:
+    pop dx
     mov word ptr [error_code], ERR_RANGE
     stc
     jmp dec_exit
@@ -228,6 +250,7 @@ _str_to_hex:
     mov si, [bp+arg1]
     xor ax, ax
     xor di, di
+    xor cx, cx
 
     cmp byte ptr [si], '-'
     jne hex_parse_start
@@ -243,6 +266,10 @@ hex_parse_start:
     xor ax, ax
 
 hex_parse_loop:
+    inc cx
+    cmp cx, 5
+    ja hex_range_err
+
     mov cl, byte ptr [si]
     cmp cl, 0
     je hex_parse_done
@@ -330,24 +357,9 @@ hex_exit:
     pop bp
     ret
 
-_skip_spaces:
-    push bp
-    mov bp, sp
-    mov si, [bp+arg1]
-skip_loop:
-    cmp byte ptr [si], ' '
-    jne skip_done
-    inc si
-    jmp skip_loop
-skip_done:
-    mov ax, si
-    pop bp
-    ret
-
 _parse_dec:
     push bp
     mov bp, sp
-    sub sp, 2
     push bx
     push cx
     push dx
@@ -366,9 +378,6 @@ _parse_dec:
     jne parse_err
     mov word ptr [val1], ax
 
-    mov si, ax
-    add si, [bp+arg1]
-    mov si, [bp+arg1]
     push si
     call _skip_spaces
     add sp, 2
@@ -397,9 +406,10 @@ parse_op_ok:
     mov byte ptr [oper], al
     inc si
 
-    cmp byte ptr [si], ' '
-    jne parse_fmt_err
-    inc si
+    push si
+    call _skip_spaces
+    add sp, 2
+    mov si, ax
 
     push si
     call _str_to_dec
@@ -408,7 +418,6 @@ parse_op_ok:
     jne parse_err
     mov word ptr [val2], ax
 
-    mov si, [bp+arg1]
     push si
     call _skip_spaces
     add sp, 2
@@ -430,14 +439,12 @@ parse_exit:
     pop dx
     pop cx
     pop bx
-    mov sp, bp
     pop bp
     ret
 
 _parse_hex:
     push bp
     mov bp, sp
-    sub sp, 2
     push bx
     push cx
     push dx
@@ -456,7 +463,6 @@ _parse_hex:
     jne parse_hex_err
     mov word ptr [val1], ax
 
-    mov si, [bp+arg1]
     push si
     call _skip_spaces
     add sp, 2
@@ -485,9 +491,10 @@ parse_hex_op_ok:
     mov byte ptr [oper], al
     inc si
 
-    cmp byte ptr [si], ' '
-    jne parse_hex_fmt_err
-    inc si
+    push si
+    call _skip_spaces
+    add sp, 2
+    mov si, ax
 
     push si
     call _str_to_hex
@@ -496,7 +503,6 @@ parse_hex_op_ok:
     jne parse_hex_err
     mov word ptr [val2], ax
 
-    mov si, [bp+arg1]
     push si
     call _skip_spaces
     add sp, 2
@@ -518,7 +524,6 @@ parse_hex_exit:
     pop dx
     pop cx
     pop bx
-    mov sp, bp
     pop bp
     ret
 
@@ -1147,6 +1152,7 @@ _calc:
     jne calc_error
     jc calc_error
     jmp calc_do
+
 calc_hex:
     push ax
     call _parse_hex
@@ -1154,6 +1160,7 @@ calc_hex:
     cmp word ptr [error_code], ERR_SUCCESS
     jne calc_error
     jc calc_error
+
 calc_do:
     mov al, byte ptr [oper]
     xor ah, ah
@@ -1167,10 +1174,10 @@ calc_do:
     jc calc_error
     call _print_res
     jmp calc_done
+
 calc_error:
     call _print_err
-    call _newline
-    add sp, 2
+
 calc_done:
     call _newline
     pop bp
